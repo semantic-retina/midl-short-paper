@@ -1,0 +1,132 @@
+\documentclass{midl} % Include author names
+\usepackage{comment}
+\usepackage{multicol}
+\usepackage{caption}
+\captionsetup{aboveskip=5pt, belowskip=-5pt, font=small}
+
+% The following packages will be automatically loaded:
+% jmlr, amsmath, amssymb, natbib, graphicx, url, algorithm2e
+% ifoddpage, relsize and probably more
+% make sure they are installed with your latex distribution
+
+\usepackage{mwe} % to get dummy images
+\usepackage{booktabs}
+
+\newcommand{\todo}[1]{{\color{red}{TODO: {#1}}}} 
+\newcommand{\info}[1]{{\color{blue}{INFO: {#1}}}} 
+
+% Header for extended abstracts.
+\jmlrproceedings{MIDL}{Medical Imaging with Deep Learning}
+\jmlrpages{}
+\jmlryear{2021}
+
+% To be uncommented for submissions under review.
+\jmlrworkshop{Short Paper -- MIDL 2021 submission}
+\jmlrvolume{-- Under Review}
+\editors{Under Review for MIDL 2021}
+
+\title[Synthesis of Diabetic Retina Fundus Images Using Semantic Label Generation]{Synthesis of Diabetic Retina Fundus Images \\ Using Semantic Label Generation}
+
+\midlauthor{\Name{Joon-Ho Son} \Email{joon-ho.son17@imperial.ac.uk}\\
+\Name{Amir Alansary} \Email{a.alansary14@imperial.ac.uk}\\
+\Name{Daniel Rueckert} \Email{d.rueckert@imperial.ac.uk}\\
+\Name{Bernhard Kainz} \Email{b.kainz@imperial.ac.uk}\\
+\Name{Benjamin Hou} \Email{benjamin.hou11@imperial.ac.uk}\\
+\addr Department of Computing, Imperial College London, UK
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Automatic segmentation of retina lesions have been a long standing and challenging task for learning based models, mostly due to the lack of available and accurate lesion segmentation datasets. In this paper, we propose a two-step process for generating photo-realistic fundus images conditioned on synthetic ``ground truth'' semantic labels, and demonstrate its potential for further downstream tasks, such as, but not limited to; automated grading of diabetic retinopathy, dataset balancing, creating image examples for trainee ophthalmologists, etc.
+\end{abstract}
+
+\begin{keywords}
+Image Synthesis, Segmentation, Generative Adversarial Networks, Diabetic Retinopathy
+\end{keywords}
+
+\section{Introduction}
+
+Retina fundus imaging is a modality that's quick and easy to obtain, however their usefulness is limited by the availability of human graders.
+With advancements in deep learning, data driven models may facilitate the process of diagnosis, alleviating this bottleneck.
+Despite this, training robust machine learning models requires manually annotated semantic labels en-masse, which are costly to obtain, and remains to be one of the primary obstacles in producing generalisable models.
+This challenge can be viewed in two aspects: the scarcity of manually annotated ground truths such as lesion segmentation maps, and class imbalance in available datasets.
+Both of these can be seen in datasets designed for classification and segmentation tasks related to diabetic retinopathy (DR). 
+
+Recently, the idea of leveraging generative models such as GANs to combat data scarcity by synthesising artificial retina images has gained attention, with DR-GAN \cite{Zhou_2020} representing the current state-of-the-art by introducing a network that enables finer control over the generation of pathological cases.
+However, this model still relies on pre-existing structural and lesion semantic labels. 
+Meanwhile, generation of natural images via texturing semantic images has been explored by \citealt{Volokitin_2020_CVPR_Workshops}.
+Building on these ideas, this work explores a two-step process to generate photo-realistic retinas with accompanying pixel-wise semantic labels.
+First, synthetic semantic labels for retina structures and lesions are generated from random noise, conditioned on DR severity.
+These are then subsequently used to condition an image-to-image translation model to create the final retina fundus image. 
+
+\section{Methods}
+We use a modified ACGAN architecture \cite{odena2017conditional} to generate class-conditioned semantic labels at a resolution of $256 \times 256$, which were then upsampled to $512 \times 512$.
+The generator produces feature maps of shape $C \times H \times W$, where each channel corresponds to a specific lesion class.
+The sparse nature of the semantic images, coupled with the large number of channels, made the discriminator's job very easy, causing the GAN to be unstable and prone to collapse early in training.
+To mitigate this, two generator training iterations were run for each discriminator iteration, and label smoothing with adaptive discriminator augmentation \cite{karras2020training} was applied to prevent overfitting. To synthesise the retinas from the generated semantic labels, we use the SPADE \cite{spade} image-to-image translation model, generating images at a resolution of $512 \times 512$.
+
+\section{Experiments}
+
+\begin{figure}[ht]
+\centering
+\subfigure[\small Semantic labels]{%
+    \label{fig:gen_semantic}% label for this sub-figure
+    \includegraphics[height=3cm]{labels_sample_colour}
+}\quad % space out the images a bit
+\subfigure[\small Fundus images]{%
+    \label{fig:gen_retina}% label for this sub-figure
+    \includegraphics[height=3cm]{images_sample}
+}\quad % space out the images a bit
+\subfigure[\small \# of synthetic images added with real data]{
+    \label{tab:results}
+    \centering
+    \scriptsize
+    \begin{tabular}{ccccc}
+    \toprule 
+         \multicolumn{2}{c}{Synthetic Data} & Precision & Recall & $F_1$ \\
+         \cmidrule{1-2}
+        Percentage & Count & & & \\
+    \midrule 
+        0\%   & 0    & 0.5777 & 0.4692 & 0.4694 \\
+        25\%  & 246  & 0.5860 & 0.4938 & 0.4965 \\
+        50\%  & 738  & 0.5925 & 0.4727 & 0.4824 \\
+        75\%  & 2214 & 0.6569 & 0.3990 & 0.4522 \\
+    \bottomrule
+    \vspace{1mm}
+    \end{tabular}
+}
+
+\caption{(a/b) Synthetically generated labels and subsequent corresponding fundus images (columns L-to-R: DR Grade 0 to 4). (c) Segmentation performance of models with addition of synthetic data.}
+\label{fig:gen}
+\end{figure}
+
+The models are trained and evaluated on a combination of IDRiD \cite{Porwal2018} and FGADR \cite{Zhou2020b} datasets.
+A number of images were omitted from FGADR, as they are inconsistent with the other samples due to annotator bias.
+To prevent data leakage from the generative models, a test set consisting of a random sample of 20\% of the total data was held out.
+Since samples from the IDRiD dataset do not have accompanying DR grades, predicted grades on these images for weakly supervised learning are used.
+
+Our preliminary experiments focus on generating semantic labels for only the optic disc and hard exudates.
+Layout prediction of the optic disc in particular was important for visually plausible retinas, where without, the SPADE generator created images which exhibited optic discs with poorly defined boundaries. 
+
+Figures \ref{fig:gen_semantic} and \ref{fig:gen_retina} show samples of synthetically generated semantic labels and fundus images, respectively. The visual results demonstrate that by dividing the task into simpler sub-problems, the GANs are able to successfully learn relationship between DR grades and prevalence of hard exudate lesions.
+However, a number of failure cases are still exhibited, noticeably in the form of generating multiple optic discs. Moreover, when the optic disc is obscured, the image model is unable to correctly place the root of the vessels. 
+
+To evaluate the results quantitatively and measure the impact of synthetic data on downstream tasks, such as lesion segmentation, synthetic retina samples are uniformly generated across DR grades 0 through 4.
+Using a basic U-Net architecture \cite{ronneberger2015unet}, a number of models were trained with varying amounts of synthetic data in addition to real data.
+Each model was trained for 40 epochs (where performance plateaued).
+The final evaluation was performed on the held-out test dataset, with results shown in Table \ref{tab:results}. 
+From this, we can see that using small amounts of synthetic data yields the greatest gain in overall performance, as measured by the F-score.
+An interesting trend is exhibited where increasing the amount of synthetic data increases precision while decreasing recall, possibly caused by a bias in the generated data.
+The overall effect of this is that F-score increases until a critical point where gains in precision are offset by losses in recall.
+
+\section{Conclusion}
+
+In this work, we have shown that controlled synthesis of retina fundus images shows promising results for downstream medical imaging tasks.
+Further applications yet to be explored include improving the performance of DR severity prediction models, and use in training human experts to better identify retinal lesions.
+
+\bibliography{midl-samplebibliography}
+
+\end{document}
